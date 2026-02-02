@@ -19,7 +19,6 @@
             position: relative; 
         }
 
-        /* עיצוב הלוגו המשופר - כוונת מיקוד */
         .logo-o {
             display: inline-flex;
             align-items: center;
@@ -32,7 +31,6 @@
             margin: 0 0.1em;
             box-shadow: 0 3px 0 #be123c;
         }
-        /* הפינות של הכוונת */
         .logo-o::before {
             content: '';
             position: absolute;
@@ -40,7 +38,6 @@
             border: 1.5px solid rgba(255,255,255,0.4);
             border-radius: 3px;
         }
-        /* הצלב הפנימי */
         .logo-o-cross-h { position: absolute; width: 40%; height: 1.5px; background: white; border-radius: 1px; }
         .logo-o-cross-v { position: absolute; width: 1.5px; height: 40%; background: white; border-radius: 1px; }
         .logo-o-dot { position: absolute; width: 3px; height: 3px; background: #facc15; border-radius: 50%; box-shadow: 0 0 5px #facc15; }
@@ -48,34 +45,34 @@
         .brick { 
             background: #f43f5e; 
             border-bottom: 4px solid #9f1239; 
-            border-radius: 8px; 
+            border-radius: 10px; 
             display: flex; 
             align-items: center; 
             justify-content: center; 
             color: white; 
             font-weight: 700; 
-            font-size: 11px; 
-            animation: dropBrick 0.5s ease-out; 
-            padding: 4px; 
+            font-size: 12px; 
+            animation: dropBrick 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            padding: 8px; 
             text-align: center; 
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
-        @keyframes dropBrick { from { transform: translateY(-50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes dropBrick { from { transform: translateY(-100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         
         .construction-site { 
             position: absolute; 
             bottom: 25%; 
             left: 50%; 
             transform: translateX(-50%); 
-            width: 180px; 
-            min-height: 140px; 
+            width: 200px; 
+            min-height: 150px; 
             border: 4px dashed rgba(255,255,255,0.4); 
-            border-radius: 1.5rem; 
+            border-radius: 2rem; 
             display: grid; 
             grid-template-columns: repeat(2, 1fr); 
-            grid-gap: 10px; 
-            padding: 12px; 
+            grid-gap: 12px; 
+            padding: 16px; 
             align-content: end;
             background: rgba(0,0,0,0.05);
         }
@@ -109,18 +106,19 @@
 
         const App = () => {
             const [view, setView] = useState('village'); 
-            const [bricks, setBricks] = useState(() => JSON.parse(localStorage.getItem('wh_bricks_v2')) || []);
+            const [bricks, setBricks] = useState(() => JSON.parse(localStorage.getItem('wh_bricks_v3')) || []);
             const [loading, setLoading] = useState(false);
             const [statusMsg, setStatusMsg] = useState('');
-            const [completedHouses, setCompletedHouses] = useState(() => Number(localStorage.getItem('wh_houses_v2')) || 0);
+            const [errorMessage, setErrorMessage] = useState(null);
+            const [completedHouses, setCompletedHouses] = useState(() => Number(localStorage.getItem('wh_houses_v3')) || 0);
             
             const apiKey = ""; 
 
             const WORDS_PER_HOUSE = 4;
 
             useEffect(() => {
-                localStorage.setItem('wh_bricks_v2', JSON.stringify(bricks));
-                localStorage.setItem('wh_houses_v2', completedHouses.toString());
+                localStorage.setItem('wh_bricks_v3', JSON.stringify(bricks));
+                localStorage.setItem('wh_houses_v3', completedHouses.toString());
                 if (window.lucide) window.lucide.createIcons();
             }, [bricks, completedHouses]);
 
@@ -132,7 +130,10 @@
             });
 
             const analyzeImage = async (base64Data) => {
-                const prompt = "Identify the main object in this image. Respond ONLY with a JSON object: {\"en\": \"WORD\", \"he\": \"מילה\"}. Use simple common English words for kids.";
+                const prompt = `Identify the primary object in the center of the image. 
+                Focus on objects suitable for a kid's village (toys, furniture, food, nature).
+                Respond ONLY with a JSON object in this format: {"en": "OBJECT_NAME", "he": "HEBREW_NAME"}.
+                Use short, simple English words.`;
                 
                 let retries = 0;
                 const maxRetries = 5;
@@ -152,14 +153,23 @@
                             })
                         });
                         
+                        if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+                        
                         const data = await response.json();
-                        const textResult = data.candidates[0].content.parts[0].text;
-                        return JSON.parse(textResult.replace(/```json|```/g, ""));
+                        const textResult = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                        
+                        if (!textResult) throw new Error("No response from AI");
+
+                        // סניטציה ל-JSON כדי למנוע קריסה
+                        const jsonMatch = textResult.match(/\{.*\}/s);
+                        if (!jsonMatch) throw new Error("Invalid format received");
+                        
+                        return JSON.parse(jsonMatch[0]);
                     } catch (err) {
                         retries++;
+                        if (retries === maxRetries) throw err;
                         const delay = Math.pow(2, retries) * 1000;
                         await new Promise(res => setTimeout(res, delay));
-                        if (retries === maxRetries) throw err;
                     }
                 }
             };
@@ -169,14 +179,16 @@
                 if (!file) return;
 
                 setLoading(true);
-                setStatusMsg('Analyzing...');
+                setErrorMessage(null);
+                setStatusMsg('Looking closely...');
 
                 try {
                     const base64 = await fileToBase64(file);
                     const result = await analyzeImage(base64);
 
-                    if (bricks.some(b => b.en.toLowerCase() === result.en.toLowerCase())) {
-                        alert(`Already found a ${result.en}! Hunt something new!`);
+                    const exists = bricks.some(b => b.en.toLowerCase() === result.en.toLowerCase());
+                    if (exists) {
+                        setErrorMessage(`You already have ${result.en}! Try a different object.`);
                         setLoading(false);
                         return;
                     }
@@ -186,88 +198,108 @@
                     if (bricks.length + 1 >= WORDS_PER_HOUSE) {
                         setBricks([]);
                         setCompletedHouses(h => h + 1);
-                        setStatusMsg('BOOM! 🏠');
-                        setTimeout(() => setView('village'), 1500);
+                        setStatusMsg('BOOM! 🏠 Built it!');
+                        setTimeout(() => setView('village'), 2000);
                     } else {
                         setBricks(prev => [...prev, newBrick]);
                         setView('village');
                     }
                 } catch (error) {
-                    alert("Oops! The AI missed. Try again!");
+                    console.error("Capture Error:", error);
+                    setErrorMessage("I couldn't quite see that. Try again in better light!");
                 } finally {
                     setLoading(false);
                 }
             };
 
             return (
-                <div className="max-w-md mx-auto h-screen relative overflow-hidden">
+                <div className="max-w-md mx-auto h-screen relative overflow-hidden bg-slate-50">
                     <div className="game-canvas z-0">
                         <header className="p-6 flex justify-between items-start">
                             <Logo size="text-2xl" />
-                            <div className="bg-white/90 px-4 py-2 rounded-2xl shadow-sm flex flex-col items-center">
-                                <span className="text-[10px] font-black text-slate-400 leading-none mb-1">HOUSES</span>
+                            <div className="bg-white/90 px-4 py-2 rounded-2xl shadow-sm flex flex-col items-center border-b-4 border-slate-200">
+                                <span className="text-[10px] font-black text-slate-400 leading-none mb-1 uppercase">Houses</span>
                                 <span className="text-xl font-black text-indigo-600 leading-none">{completedHouses}</span>
                             </div>
                         </header>
 
+                        {/* Village View */}
                         <div className="absolute bottom-[38%] w-full flex flex-wrap justify-center gap-4 px-10 pointer-events-none">
                             {[...Array(completedHouses)].map((_, i) => (
                                 <div key={i} className="text-5xl animate-bounce" style={{animationDelay: `${i*0.1}s`}}>🏠</div>
                             ))}
                         </div>
 
+                        {/* Brick Building Site */}
                         <div className="construction-site">
                             {bricks.map((b) => (
                                 <div key={b.id} className="brick uppercase flex flex-col">
-                                    <span className="text-[8px] opacity-70 leading-none mb-0.5">{b.he}</span>
+                                    <span className="text-[9px] opacity-70 leading-none mb-1">{b.he}</span>
                                     <span className="leading-none">{b.en}</span>
                                 </div>
                             ))}
                             {bricks.length < WORDS_PER_HOUSE && (
                                 <div className="col-span-2 text-center pb-2">
-                                    <div className="text-[10px] font-black text-white uppercase animate-pulse tracking-wide">
-                                        Scan {WORDS_PER_HOUSE - bricks.length} more bricks!
+                                    <div className="text-[10px] font-black text-white uppercase animate-pulse tracking-widest bg-black/10 rounded-full py-1">
+                                        {WORDS_PER_HOUSE - bricks.length} more bricks!
                                     </div>
                                 </div>
                             )}
                         </div>
                     </div>
 
+                    {/* SCANNER UI */}
                     {view === 'hunt' && (
-                        <div className="absolute inset-0 z-50 bg-slate-900/95 backdrop-blur-md p-6 flex items-center justify-center">
+                        <div className="absolute inset-0 z-50 bg-slate-900/90 backdrop-blur-md p-6 flex items-center justify-center">
                             <div className="kid-card w-full p-8 text-center border-4 border-yellow-400">
                                 {loading ? (
                                     <div className="py-10 flex flex-col items-center">
-                                        <div className="w-16 h-16 border-8 border-yellow-400 border-t-rose-500 rounded-full animate-spin mb-6"></div>
-                                        <h3 className="text-xl font-black text-slate-800 italic uppercase">{statusMsg}</h3>
+                                        <div className="w-20 h-20 border-[12px] border-white/20 border-t-yellow-400 rounded-full animate-spin mb-6"></div>
+                                        <h3 className="text-2xl font-black text-slate-800 italic uppercase">{statusMsg}</h3>
                                     </div>
                                 ) : (
                                     <>
-                                        <div className="w-20 h-20 bg-rose-500 rounded-3xl mx-auto mb-6 flex items-center justify-center text-white shadow-lg">
-                                            <Icon name="scan" size={40} />
-                                        </div>
-                                        <h2 className="text-3xl font-black text-slate-800 mb-2 italic">HUNT!</h2>
-                                        <p className="text-slate-400 text-sm mb-8 font-bold">Find an object and snap it!</p>
-                                        <label className="block w-full bg-green-400 py-5 rounded-[2rem] font-black text-xl text-green-900 cursor-pointer text-center uppercase shadow-[0_8px_0_#16a34a] btn-bounce">
-                                            OPEN CAMERA
-                                            <input type="file" accept="image/*" capture="environment" onChange={handleCapture} className="hidden" />
-                                        </label>
-                                        <button onClick={() => setView('village')} className="mt-8 text-slate-400 font-bold uppercase text-xs tracking-widest">Back to village</button>
+                                        {errorMessage ? (
+                                            <div className="mb-6">
+                                                <div className="w-16 h-16 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                    <Icon name="alert-circle" size={32} />
+                                                </div>
+                                                <p className="text-slate-600 font-bold mb-6">{errorMessage}</p>
+                                                <button onClick={() => setErrorMessage(null)} className="text-indigo-600 font-black uppercase text-sm">Try Again</button>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className="w-24 h-24 bg-rose-500 rounded-[2rem] mx-auto mb-6 flex items-center justify-center text-white shadow-lg rotate-3">
+                                                    <Icon name="scan" size={48} />
+                                                </div>
+                                                <h2 className="text-3xl font-black text-slate-800 mb-2 italic">HUNT!</h2>
+                                                <p className="text-slate-400 text-sm mb-8 font-bold px-4">Find a cool object and snap a photo to get a brick!</p>
+                                            </>
+                                        )}
+                                        
+                                        {!errorMessage && (
+                                            <label className="block w-full bg-green-400 py-5 rounded-[2.5rem] font-black text-2xl text-green-900 cursor-pointer text-center uppercase shadow-[0_10px_0_#16a34a] btn-bounce border-2 border-white/20">
+                                                CAPTURE
+                                                <input type="file" accept="image/*" capture="environment" onChange={handleCapture} className="hidden" />
+                                            </label>
+                                        )}
+                                        <button onClick={() => setView('village')} className="mt-8 text-slate-400 font-bold uppercase text-xs tracking-widest">Back to Village</button>
                                     </>
                                 )}
                             </div>
                         </div>
                     )}
 
+                    {/* NAV */}
                     <nav className="absolute bottom-8 left-0 right-0 px-10 flex justify-between items-center z-40">
-                        <button className="w-14 h-14 kid-card flex items-center justify-center text-slate-400 btn-bounce">
-                            <Icon name="book-open" size={24} />
+                        <button className="w-16 h-16 kid-card flex items-center justify-center text-slate-400 btn-bounce">
+                            <Icon name="book-open" size={28} />
                         </button>
-                        <button onClick={() => setView('hunt')} className="w-20 h-20 bg-yellow-400 rounded-full flex items-center justify-center shadow-[0_8px_0_#ca8a04] border-8 border-white btn-bounce">
-                            <Icon name="camera" size={36} className="text-yellow-900" />
+                        <button onClick={() => setView('hunt')} className="w-24 h-24 bg-yellow-400 rounded-full flex items-center justify-center shadow-[0_10px_0_#ca8a04] border-[10px] border-white btn-bounce">
+                            <Icon name="camera" size={40} className="text-yellow-900" />
                         </button>
-                        <button onClick={() => {localStorage.clear(); window.location.reload();}} className="w-14 h-14 kid-card flex items-center justify-center text-slate-400 btn-bounce">
-                            <Icon name="refresh-cw" size={24} />
+                        <button onClick={() => {if(confirm('Start new village?')) {localStorage.clear(); window.location.reload();}}} className="w-16 h-16 kid-card flex items-center justify-center text-slate-400 btn-bounce">
+                            <Icon name="refresh-cw" size={28} />
                         </button>
                     </nav>
                 </div>
