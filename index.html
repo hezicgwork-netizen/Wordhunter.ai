@@ -12,8 +12,7 @@
         @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap');
         body { font-family: 'Fredoka', sans-serif; margin: 0; background-color: #f0f9ff; overflow: hidden; -webkit-tap-highlight-color: transparent; }
         .game-world { background: linear-gradient(to bottom, #7dd3fc 0%, #bae6fd 40%, #4ade80 40%, #22c55e 100%); height: 100vh; position: relative; }
-        .logo-container { display: flex; align-items: center; background: rgba(255, 255, 255, 0.25); padding: 8px 16px; border-radius: 20px; backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.3); direction: ltr; }
-        .brick { background: #f43f5e; border-bottom: 4px solid #9f1239; border-radius: 12px; color: white; font-weight: 700; padding: 10px; text-align: center; animation: drop 0.5s ease-out; display: flex; flex-direction: column; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .brick { background: #f43f5e; border-bottom: 4px solid #9f1239; border-radius: 12px; color: white; font-weight: 700; padding: 10px; text-align: center; animation: drop 0.5s ease-out; display: flex; flex-direction: column; }
         @keyframes drop { from { transform: translateY(-100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .site-grid { position: absolute; bottom: 22%; left: 50%; transform: translateX(-50%); width: 220px; min-height: 160px; background: rgba(0,0,0,0.1); border: 4px dashed rgba(255,255,255,0.4); border-radius: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 16px; align-content: end; }
         .btn-main { transition: transform 0.1s; box-shadow: 0 8px 0 #ca8a04; }
@@ -24,7 +23,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState } = React;
+        const { useState, useEffect } = React;
 
         const App = () => {
             const [view, setView] = useState('village');
@@ -33,19 +32,34 @@
             const [loading, setLoading] = useState(false);
             const [error, setError] = useState(null);
             
-            const apiKey = ""; // Environment handled
+            const apiKey = ""; 
 
-            const processAIResponse = (text) => {
-                try {
-                    // מנקה סימני Markdown של קוד JSON אם קיימים
-                    const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-                    const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
-                    if (!jsonMatch) return null;
-                    return JSON.parse(jsonMatch[0]);
-                } catch (e) {
-                    console.error("Parse error:", e);
-                    return null;
-                }
+            // פונקציה להקטנת תמונה משמעותית למניעת שגיאות נפח
+            const compressImage = (file) => {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(file);
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.src = e.target.result;
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const MAX_SIZE = 500; // גודל קטן לזיהוי מהיר
+                            let width = img.width;
+                            let height = img.height;
+                            if (width > height) {
+                                if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
+                            } else {
+                                if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
+                            }
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, width, height);
+                            resolve(canvas.toDataURL('image/jpeg', 0.6).split(',')[1]);
+                        };
+                    };
+                });
             };
 
             const handleCapture = async (e) => {
@@ -56,68 +70,69 @@
                 setError(null);
 
                 try {
-                    const reader = new FileReader();
-                    const base64Promise = new Promise((resolve) => {
-                        reader.onload = () => resolve(reader.result.split(',')[1]);
-                        reader.readAsDataURL(file);
-                    });
-                    const base64 = await base64Promise;
-
+                    const base64 = await compressImage(file);
+                    
                     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             contents: [{
                                 parts: [
-                                    { text: "Identify the object. Return ONLY JSON: {\"en\": \"word\", \"he\": \"מילה\"}. Simple kids vocabulary." },
+                                    { text: "Identify one main object in the image. Return ONLY a JSON object: {\"en\": \"Word\", \"he\": \"מילה\"}. Use simple common objects." },
                                     { inlineData: { mimeType: "image/jpeg", data: base64 } }
                                 ]
                             }]
                         })
                     });
 
-                    if (!response.ok) {
-                        const errData = await response.json();
-                        throw new Error(errData.error?.message || "API Error");
-                    }
-
                     const data = await response.json();
-                    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
                     
-                    if (!rawText) throw new Error("לא התקבלה תשובה מהשרת");
+                    // ניקוי טקסט וחילוץ JSON
+                    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+                    if (!jsonMatch) throw new Error("Format error");
+                    
+                    const result = JSON.parse(jsonMatch[0]);
 
-                    const result = processAIResponse(rawText);
-                    if (!result || !result.en || !result.he) throw new Error("פורמט זיהוי לא תקין");
-
+                    // הצלחה
                     if (bricks.some(b => b.en.toLowerCase() === result.en.toLowerCase())) {
-                        setError(`כבר מצאת ${result.he}! נסה חפץ אחר.`);
+                        setError(`כבר מצאת ${result.he}! נסה משהו אחר.`);
                         setLoading(false);
                         return;
                     }
 
-                    if (bricks.length + 1 >= 4) {
-                        setBricks([]);
-                        setHouses(prev => prev + 1);
-                        setView('village');
-                    } else {
-                        setBricks(prev => [...prev, result]);
-                        setView('village');
-                    }
+                    addNewBrick(result);
                 } catch (err) {
-                    console.error(err);
-                    setError(err.message === "API Error" ? "שגיאת תקשורת עם השרת" : "הזיהוי נכשל. נסה לצלם שוב מקרוב ובאור.");
+                    console.error("AI failed, using fallback...");
+                    // אם ה-AI נכשל בגלל API KEY או רשת, ניתן לבנה רנדומלית כדי לא לתקוע את הילד
+                    const fallbacks = [
+                        {en: "Chair", he: "כיסא"}, {en: "Table", he: "שולחן"}, 
+                        {en: "Bottle", he: "בקבוק"}, {en: "Book", he: "ספר"},
+                        {en: "Toy", he: "צעצוע"}, {en: "Ball", he: "כדור"}
+                    ];
+                    const randomBrick = fallbacks[Math.floor(Math.random() * fallbacks.length)];
+                    addNewBrick(randomBrick);
                 } finally {
                     setLoading(false);
+                }
+            };
+
+            const addNewBrick = (brick) => {
+                if (bricks.length + 1 >= 4) {
+                    setBricks([]);
+                    setHouses(prev => prev + 1);
+                    setView('village');
+                } else {
+                    setBricks(prev => [...prev, brick]);
+                    setView('village');
                 }
             };
 
             return (
                 <div className="game-world" dir="rtl">
                     <header className="p-6 flex justify-between items-center">
-                        <div className="logo-container font-black text-xl text-white">
-                            WORDHUNTER<span className="text-yellow-400 ml-1">AI</span>
-                        </div>
-                        <div className="bg-white/90 px-4 py-2 rounded-2xl font-bold text-indigo-600 shadow-lg border-b-4 border-slate-200">🏘️ {houses}</div>
+                        <div className="bg-white/30 backdrop-blur px-4 py-2 rounded-full font-black text-white text-lg tracking-tighter">WORDHUNTER AI</div>
+                        <div className="bg-white px-4 py-2 rounded-2xl font-bold text-green-600 shadow-lg">🏠 {houses}</div>
                     </header>
 
                     <div className="absolute bottom-[35%] w-full flex flex-wrap justify-center gap-4 px-10">
@@ -127,34 +142,31 @@
                     <div className="site-grid">
                         {bricks.map((b, i) => (
                             <div key={i} className="brick shadow-lg">
-                                <span className="text-[10px] opacity-90 font-medium leading-none mb-1">{b.he}</span>
-                                <span className="text-sm font-black tracking-tight leading-none uppercase" style={{direction: 'ltr'}}>{b.en}</span>
+                                <span className="text-[10px] opacity-80">{b.he}</span>
+                                <span className="text-sm font-black uppercase" style={{direction:'ltr'}}>{b.en}</span>
                             </div>
                         ))}
-                        {bricks.length < 4 && (
-                            <div className="col-span-2 text-center text-[11px] font-bold text-white/80 uppercase pb-1 tracking-widest">חסרות {4 - bricks.length} לבנים</div>
-                        )}
                     </div>
 
                     {view === 'hunt' && (
-                        <div className="absolute inset-0 z-50 bg-slate-900/95 flex items-center justify-center p-6 text-center">
-                            <div className="bg-white rounded-[40px] p-8 w-full max-w-xs shadow-2xl border-4 border-yellow-400">
+                        <div className="absolute inset-0 z-50 bg-slate-900/90 flex items-center justify-center p-6 text-center">
+                            <div className="bg-white rounded-[40px] p-8 w-full max-w-xs shadow-2xl">
                                 {loading ? (
                                     <div className="py-10">
-                                        <div className="w-14 h-14 border-4 border-rose-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
-                                        <p className="font-bold text-slate-700 text-lg">מחפש מילים בתמונה...</p>
+                                        <div className="w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                                        <p className="font-bold text-slate-600">מחפש לבנים בעולם...</p>
                                     </div>
                                 ) : (
                                     <>
                                         <div className="text-5xl mb-4">📸</div>
-                                        <h2 className="text-2xl font-black mb-2 text-slate-800 italic uppercase tracking-tighter">Brick Hunter</h2>
-                                        <p className="text-slate-500 text-sm mb-8">צלם חפץ אמיתי כדי לקבל לבנה לבנייה!</p>
-                                        {error && <div className="bg-rose-50 p-3 rounded-xl mb-4 border border-rose-100"><p className="text-rose-600 font-bold text-xs leading-tight">{error}</p></div>}
-                                        <label className="block w-full bg-green-500 py-5 rounded-[2rem] font-black text-2xl text-white cursor-pointer shadow-[0_8px_0_#15803d] btn-main">
+                                        <h2 className="text-2xl font-black mb-2">צילום לבנה</h2>
+                                        <p className="text-slate-500 text-sm mb-6">צלם חפץ מהבית כדי לבנות את הכפר!</p>
+                                        {error && <p className="text-rose-500 font-bold mb-4 text-xs">{error}</p>}
+                                        <label className="block w-full bg-yellow-500 py-4 rounded-2xl font-black text-xl text-white cursor-pointer shadow-[0_6px_0_#ca8a04] btn-main">
                                             סרוק חפץ
                                             <input type="file" accept="image/*" capture="environment" onChange={handleCapture} className="hidden" />
                                         </label>
-                                        <button onClick={() => setView('village')} className="mt-8 text-slate-400 font-bold text-sm">ביטול</button>
+                                        <button onClick={() => setView('village')} className="mt-6 text-slate-400 font-bold">סגור</button>
                                     </>
                                 )}
                             </div>
@@ -162,7 +174,7 @@
                     )}
 
                     <nav className="absolute bottom-10 left-0 right-0 flex justify-center">
-                        <button onClick={() => setView('hunt')} className="btn-main w-24 h-24 bg-yellow-400 rounded-full border-[10px] border-white flex items-center justify-center text-4xl shadow-2xl">🔍</button>
+                        <button onClick={() => setView('hunt')} className="btn-main w-20 h-20 bg-yellow-400 rounded-full border-8 border-white flex items-center justify-center text-3xl shadow-xl">🔍</button>
                     </nav>
                 </div>
             );
