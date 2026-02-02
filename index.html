@@ -10,95 +10,15 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap');
-        
-        body { 
-            font-family: 'Fredoka', sans-serif; 
-            margin: 0; 
-            background-color: #f0f9ff;
-            overflow: hidden;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        .game-world {
-            background: linear-gradient(to bottom, #7dd3fc 0%, #bae6fd 40%, #4ade80 40%, #22c55e 100%);
-            height: 100vh;
-            position: relative;
-        }
-
-        /* לוגו פשוט ונקי */
-        .logo-container {
-            display: flex;
-            align-items: center;
-            background: rgba(255, 255, 255, 0.25);
-            padding: 10px 20px;
-            border-radius: 25px;
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-        }
-
-        .logo-text {
-            color: white;
-            font-weight: 900;
-            font-size: 1.5rem;
-            letter-spacing: -0.02em;
-            display: flex;
-            gap: 2px;
-            /* הבטחת כיווניות משמאל לימין לטקסט האנגלי בלוגו */
-            direction: ltr; 
-        }
-
-        .logo-highlight {
-            color: #facc15;
-            margin-left: 4px;
-        }
-
-        .brick {
-            background: #f43f5e;
-            border-bottom: 4px solid #9f1239;
-            border-radius: 12px;
-            color: white;
-            font-weight: 700;
-            padding: 10px;
-            text-align: center;
-            animation: drop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
-        @keyframes drop {
-            from { transform: translateY(-100px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-
-        .site-grid {
-            position: absolute;
-            bottom: 22%;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 220px;
-            min-height: 160px;
-            background: rgba(0,0,0,0.1);
-            border: 4px dashed rgba(255,255,255,0.4);
-            border-radius: 24px;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            padding: 16px;
-            align-content: end;
-        }
-
-        .btn-main {
-            transition: transform 0.1s;
-            box-shadow: 0 8px 0 #ca8a04;
-        }
-
-        .btn-main:active {
-            transform: translateY(4px);
-            box-shadow: 0 4px 0 #ca8a04;
-        }
-
-        /* תיקון עברית ואנגלית */
+        body { font-family: 'Fredoka', sans-serif; margin: 0; background-color: #f0f9ff; overflow: hidden; }
+        .game-world { background: linear-gradient(to bottom, #7dd3fc 0%, #bae6fd 40%, #4ade80 40%, #22c55e 100%); height: 100vh; position: relative; }
+        .logo-container { display: flex; align-items: center; background: rgba(255, 255, 255, 0.25); padding: 10px 20px; border-radius: 25px; backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.3); }
+        .logo-text { color: white; font-weight: 900; font-size: 1.5rem; letter-spacing: -0.02em; display: flex; gap: 2px; direction: ltr; }
+        .brick { background: #f43f5e; border-bottom: 4px solid #9f1239; border-radius: 12px; color: white; font-weight: 700; padding: 10px; text-align: center; animation: drop 0.5s ease-out; display: flex; flex-direction: column; }
+        @keyframes drop { from { transform: translateY(-100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .site-grid { position: absolute; bottom: 22%; left: 50%; transform: translateX(-50%); width: 220px; min-height: 160px; background: rgba(0,0,0,0.1); border: 4px dashed rgba(255,255,255,0.4); border-radius: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 16px; align-content: end; }
+        .btn-main { transition: transform 0.1s; box-shadow: 0 8px 0 #ca8a04; }
+        .btn-main:active { transform: translateY(4px); box-shadow: 0 4px 0 #ca8a04; }
         .hebrew-text { direction: rtl; text-align: center; }
         .english-text { direction: ltr; text-align: center; }
     </style>
@@ -118,6 +38,28 @@
             
             const apiKey = ""; 
 
+            // פונקציה להקטנת תמונה לשיפור מהירות ואמינות
+            const resizeImage = (file) => {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(file);
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.src = event.target.result;
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const MAX_WIDTH = 800;
+                            const scale = MAX_WIDTH / img.width;
+                            canvas.width = MAX_WIDTH;
+                            canvas.height = img.height * scale;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                            resolve(canvas.toDataURL('image/jpeg', 0.7).split(',')[1]);
+                        };
+                    };
+                });
+            };
+
             const handleCapture = async (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -126,12 +68,7 @@
                 setError(null);
 
                 try {
-                    const reader = new FileReader();
-                    const base64Promise = new Promise((resolve) => {
-                        reader.onload = () => resolve(reader.result.split(',')[1]);
-                        reader.readAsDataURL(file);
-                    });
-                    const base64 = await base64Promise;
+                    const base64 = await resizeImage(file);
 
                     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
                         method: 'POST',
@@ -139,16 +76,24 @@
                         body: JSON.stringify({
                             contents: [{
                                 parts: [
-                                    { text: "Identify the main object. Return JSON only: {\"en\": \"WORD\", \"he\": \"מילה\"}" },
-                                    { inlineData: { mimeType: "image/png", data: base64 } }
+                                    { text: "Identify the main object in this image. Respond with a JSON object only: {\"en\": \"simple_word\", \"he\": \"מילה_פשוטה\"}. No other text." },
+                                    { inlineData: { mimeType: "image/jpeg", data: base64 } }
                                 ]
                             }]
                         })
                     });
 
+                    if (!response.ok) throw new Error("Network response was not ok");
+
                     const data = await response.json();
-                    const text = data.candidates[0].content.parts[0].text;
-                    const jsonMatch = text.match(/\{.*\}/s);
+                    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    
+                    if (!rawText) throw new Error("No data from AI");
+
+                    // חילוץ JSON בצורה חכמה
+                    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+                    if (!jsonMatch) throw new Error("Could not find JSON in response");
+                    
                     const result = JSON.parse(jsonMatch[0]);
 
                     if (bricks.some(b => b.en.toLowerCase() === result.en.toLowerCase())) {
@@ -166,7 +111,8 @@
                         setView('village');
                     }
                 } catch (err) {
-                    setError("לא הצלחתי לזהות. נסה לצלם שוב בבירור.");
+                    console.error("Error details:", err);
+                    setError("הזיהוי נכשל. וודא שיש אינטרנט ושהצילום ברור.");
                 } finally {
                     setLoading(false);
                 }
@@ -174,26 +120,17 @@
 
             return (
                 <div className="game-world" dir="rtl">
-                    {/* לוגו פשוט */}
                     <header className="p-6 flex justify-between items-center">
                         <div className="logo-container">
-                            <div className="logo-text">
-                                WORDHUNTER<span className="logo-highlight">AI</span>
-                            </div>
+                            <div className="logo-text">WORDHUNTER<span className="text-yellow-400 ml-1">AI</span></div>
                         </div>
-                        <div className="bg-white/90 px-4 py-2 rounded-2xl font-bold text-indigo-600 shadow-lg border-b-4 border-slate-200">
-                            🏘️ {houses}
-                        </div>
+                        <div className="bg-white/90 px-4 py-2 rounded-2xl font-bold text-indigo-600 shadow-lg border-b-4 border-slate-200">🏘️ {houses}</div>
                     </header>
 
-                    {/* כפר הבתים */}
                     <div className="absolute bottom-[35%] w-full flex flex-wrap justify-center gap-4 px-10 pointer-events-none">
-                        {[...Array(houses)].map((_, i) => (
-                            <div key={i} className="text-5xl animate-bounce" style={{animationDelay: `${i*0.1}s`}}>🏠</div>
-                        ))}
+                        {[...Array(houses)].map((_, i) => <div key={i} className="text-5xl animate-bounce">🏠</div>)}
                     </div>
 
-                    {/* אתר בנייה */}
                     <div className="site-grid">
                         {bricks.map((b, i) => (
                             <div key={i} className="brick shadow-lg">
@@ -202,13 +139,10 @@
                             </div>
                         ))}
                         {bricks.length < 4 && (
-                            <div className="col-span-2 text-center text-[11px] font-bold text-white/80 uppercase pb-1 tracking-widest">
-                                חסרות {4 - bricks.length} לבנים
-                            </div>
+                            <div className="col-span-2 text-center text-[11px] font-bold text-white/80 uppercase pb-1 tracking-widest">חסרות {4 - bricks.length} לבנים</div>
                         )}
                     </div>
 
-                    {/* מסך סריקה */}
                     {view === 'hunt' && (
                         <div className="absolute inset-0 z-50 bg-slate-900/95 flex items-center justify-center p-6 text-center">
                             <div className="bg-white rounded-[40px] p-8 w-full max-w-xs shadow-2xl border-4 border-yellow-400">
@@ -219,35 +153,23 @@
                                     </div>
                                 ) : (
                                     <>
-                                        <div className="text-5xl mb-4">🧱</div>
+                                        <div className="text-5xl mb-4">📸</div>
                                         <h2 className="text-2xl font-black mb-2 text-slate-800">צייד לבנים</h2>
-                                        <p className="text-slate-500 text-sm mb-8 leading-tight">צלם חפץ בבית כדי לקבל לבנה לבנייה!</p>
-                                        
-                                        {error && (
-                                            <div className="bg-rose-50 p-3 rounded-xl mb-4">
-                                                <p className="text-rose-600 font-bold text-sm">{error}</p>
-                                            </div>
-                                        )}
-                                        
+                                        <p className="text-slate-500 text-sm mb-8 leading-tight">צלם חפץ בבית כדי לקבל לבנה!</p>
+                                        {error && <div className="bg-rose-50 p-3 rounded-xl mb-4"><p className="text-rose-600 font-bold text-sm">{error}</p></div>}
                                         <label className="block w-full bg-green-500 py-5 rounded-[2rem] font-black text-2xl text-white cursor-pointer shadow-[0_8px_0_#15803d] btn-main">
-                                            צלם חפץ
+                                            צלם עכשיו
                                             <input type="file" accept="image/*" capture="environment" onChange={handleCapture} className="hidden" />
                                         </label>
-                                        <button onClick={() => setView('village')} className="mt-8 text-slate-400 font-bold text-sm uppercase tracking-tighter">חזור</button>
+                                        <button onClick={() => setView('village')} className="mt-8 text-slate-400 font-bold text-sm">חזור</button>
                                     </>
                                 )}
                             </div>
                         </div>
                     )}
 
-                    {/* ניווט ראשי */}
                     <nav className="absolute bottom-10 left-0 right-0 flex justify-center">
-                        <button 
-                            onClick={() => setView('hunt')}
-                            className="btn-main w-24 h-24 bg-yellow-400 rounded-full border-[10px] border-white flex items-center justify-center text-4xl shadow-2xl"
-                        >
-                            🔍
-                        </button>
+                        <button onClick={() => setView('hunt')} className="btn-main w-24 h-24 bg-yellow-400 rounded-full border-[10px] border-white flex items-center justify-center text-4xl shadow-2xl">🔍</button>
                     </nav>
                 </div>
             );
