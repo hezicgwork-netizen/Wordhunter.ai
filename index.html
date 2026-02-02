@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WordHunter AI - Build Your Village</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/lucide-static/0.321.0/lucide.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap');
+        
+        body { 
+            font-family: 'Fredoka', sans-serif; 
+            background-color: #f8fafc;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .game-canvas {
+            background: linear-gradient(to bottom, #7dd3fc 0%, #bae6fd 40%, #4ade80 40%, #22c55e 100%);
+            height: 100vh;
+            position: relative;
+        }
+
+        .brick {
+            background: #f43f5e;
+            border-bottom: 4px solid #9f1239;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 10px;
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            animation: dropBrick 0.5s ease-out;
+        }
+
+        @keyframes dropBrick {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .construction-site {
+            position: absolute;
+            bottom: 25%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 160px;
+            height: 120px;
+            border: 3px dashed rgba(255,255,255,0.5);
+            border-radius: 1rem;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-gap: 8px;
+            padding: 8px;
+            align-content: end;
+        }
+
+        .scaffold {
+            position: absolute;
+            bottom: 25%;
+            left: 50%;
+            transform: translateX(-50%);
+            pointer-events: none;
+        }
+
+        .kid-card { 
+            background: white; 
+            border-radius: 2rem; 
+            box-shadow: 0 8px 0 #cbd5e1;
+            border: 3px solid #f1f5f9;
+        }
+
+        .btn-bounce:active { transform: translateY(4px); box-shadow: none !important; }
+        
+        .logo-focus {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 0.85em;
+            height: 0.85em;
+            background: #f43f5e;
+            border: 3px solid #facc15;
+            border-radius: 4px;
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const Icon = ({ name, size = 24, className = "" }) => (
+            <i data-lucide={name} style={{ width: size, height: size }} className={className}></i>
+        );
+
+        const App = () => {
+            const [view, setView] = useState('village'); 
+            const [words, setWords] = useState(() => JSON.parse(localStorage.getItem('wh_bricks_v1')) || []);
+            const [loading, setLoading] = useState(false);
+            const [completedHouses, setCompletedHouses] = useState(() => Number(localStorage.getItem('wh_houses_v1')) || 0);
+
+            const WORDS_PER_HOUSE = 4;
+
+            useEffect(() => {
+                localStorage.setItem('wh_bricks_v1', JSON.stringify(words));
+                localStorage.setItem('wh_houses_v1', completedHouses.toString());
+                if (window.lucide) window.lucide.createIcons();
+            }, [words, completedHouses]);
+
+            const handleCapture = (e) => {
+                setLoading(true);
+                // Simulated capture
+                setTimeout(() => {
+                    const newWord = {
+                        id: Date.now(),
+                        en: "CHAIR",
+                        he: "כיסא"
+                    };
+                    
+                    if (words.length + 1 >= WORDS_PER_HOUSE) {
+                        setWords([]);
+                        setCompletedHouses(h => h + 1);
+                    } else {
+                        setWords(prev => [...prev, newWord]);
+                    }
+                    
+                    setLoading(false);
+                    setView('village');
+                }, 1500);
+            };
+
+            return (
+                <div className="max-w-md mx-auto h-screen relative overflow-hidden">
+                    
+                    {/* GAME WORLD */}
+                    <div className="game-canvas z-0">
+                        {/* Status Header */}
+                        <header className="p-6 flex justify-between items-start">
+                            <div className="flex flex-col gap-2">
+                                <div className="font-black text-2xl text-white drop-shadow-md flex items-center tracking-tighter">
+                                    W<div className="logo-focus mx-0.5"></div>RDHUNTER <span className="text-yellow-300 ml-1 italic text-lg">AI</span>
+                                </div>
+                                <div className="bg-white/90 px-3 py-1 rounded-full text-[10px] font-black text-indigo-600 self-start shadow-sm">
+                                    ESTATE: {completedHouses} HOUSES BUILT
+                                </div>
+                            </div>
+                            <button className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-white"><Icon name="user" size={20}/></button>
+                        </header>
+
+                        {/* Completed Houses (The Village) */}
+                        <div className="absolute bottom-[35%] w-full flex flex-wrap justify-center gap-4 px-10 pointer-events-none">
+                            {[...Array(completedHouses)].map((_, i) => (
+                                <div key={i} className="text-5xl animate-bounce" style={{animationDelay: `${i*0.2}s`}}>🏠</div>
+                            ))}
+                        </div>
+
+                        {/* Current Construction Site */}
+                        <div className="construction-site bg-black/5">
+                            {words.map((w, i) => (
+                                <div key={w.id} className="brick h-10 uppercase">
+                                    {w.en}
+                                </div>
+                            ))}
+                            {words.length < WORDS_PER_HOUSE && (
+                                <div className="col-span-2 text-center pb-2">
+                                    <div className="text-[10px] font-black text-white/60 uppercase">
+                                        Need {WORDS_PER_HOUSE - words.length} more bricks
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        
+                        {/* Floor Graphics */}
+                        <div className="absolute bottom-10 left-0 right-0 px-10 flex justify-center opacity-20 pointer-events-none">
+                            <Icon name="hammer" size={120} className="text-white" />
+                        </div>
+                    </div>
+
+                    {/* SCANNER OVERLAY */}
+                    {view === 'hunt' && (
+                        <div className="absolute inset-0 z-50 bg-slate-900/95 backdrop-blur-md p-6 flex items-center justify-center">
+                            <div className="kid-card w-full p-8 text-center border-4 border-yellow-400">
+                                {loading ? (
+                                    <div className="py-10 flex flex-col items-center">
+                                        <div className="w-16 h-16 border-8 border-yellow-400 border-t-rose-500 rounded-full animate-spin mb-6"></div>
+                                        <h3 className="text-xl font-black text-slate-800 italic uppercase">Hunting Bricks...</h3>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="w-20 h-20 bg-rose-500 rounded-3xl mx-auto mb-6 flex items-center justify-center text-white shadow-lg">
+                                            <Icon name="camera" size={40} />
+                                        </div>
+                                        <h2 className="text-2xl font-black text-slate-800 mb-2">NEW BRICK!</h2>
+                                        <p className="text-slate-400 text-sm mb-8 font-bold">Scan an object to build your house.</p>
+                                        <label className="block w-full bg-green-400 py-5 rounded-3xl font-black text-xl text-green-900 cursor-pointer text-center uppercase shadow-[0_6px_0_#16a34a] btn-bounce">
+                                            START SCAN
+                                            <input type="file" accept="image/*" capture="environment" onChange={handleCapture} className="hidden" />
+                                        </label>
+                                        <button onClick={() => setView('village')} className="mt-6 text-slate-400 font-bold uppercase text-xs tracking-widest">Cancel</button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* BOTTOM NAV */}
+                    <nav className="absolute bottom-8 left-0 right-0 px-10 flex justify-between items-center z-40">
+                        <button className="w-14 h-14 kid-card flex items-center justify-center text-slate-400 btn-bounce">
+                            <Icon name="layout" size={24} />
+                        </button>
+                        
+                        <button 
+                            onClick={() => setView('hunt')}
+                            className="w-20 h-20 bg-yellow-400 rounded-full flex items-center justify-center shadow-[0_8px_0_#ca8a04] border-8 border-white btn-bounce"
+                        >
+                            <Icon name="plus-circle" size={32} className="text-yellow-900" />
+                        </button>
+                        
+                        <button onClick={() => {localStorage.clear(); window.location.reload();}} className="w-14 h-14 kid-card flex items-center justify-center text-slate-400 btn-bounce">
+                            <Icon name="trash-2" size={24} />
+                        </button>
+                    </nav>
+
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</body>
+</html>
