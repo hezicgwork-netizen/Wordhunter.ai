@@ -1,274 +1,252 @@
 <!DOCTYPE html>
-<html lang="en" dir="ltr">
+<html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>WordHunter AI - Real Scanner</title>
-    <script src="[https://unpkg.com/react@18/umd/react.production.min.js](https://unpkg.com/react@18/umd/react.production.min.js)"></script>
-    <script src="[https://unpkg.com/react-dom@18/umd/react-dom.production.min.js](https://unpkg.com/react-dom@18/umd/react-dom.production.min.js)"></script>
-    <script src="[https://unpkg.com/@babel/standalone/babel.min.js](https://unpkg.com/@babel/standalone/babel.min.js)"></script>
-    <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
-    <link href="[https://cdnjs.cloudflare.com/ajax/libs/lucide-static/0.321.0/lucide.min.css](https://cdnjs.cloudflare.com/ajax/libs/lucide-static/0.321.0/lucide.min.css)" rel="stylesheet">
+    <title>WordHunter AI</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('[https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap](https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap)');
-        body { font-family: 'Fredoka', sans-serif; background-color: #f8fafc; margin: 0; overflow: hidden; }
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap');
         
-        .game-canvas { 
-            background: linear-gradient(to bottom, #7dd3fc 0%, #bae6fd 40%, #4ade80 40%, #22c55e 100%); 
-            height: 100vh; 
-            position: relative; 
+        body { 
+            font-family: 'Fredoka', sans-serif; 
+            margin: 0; 
+            background-color: #f0f9ff;
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
         }
 
-        .logo-o {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 0.9em;
-            height: 0.9em;
-            background: #f43f5e;
-            border-radius: 6px;
+        .game-world {
+            background: linear-gradient(to bottom, #7dd3fc 0%, #bae6fd 40%, #4ade80 40%, #22c55e 100%);
+            height: 100vh;
             position: relative;
-            margin: 0 0.1em;
-            box-shadow: 0 3px 0 #be123c;
         }
 
-        .brick { 
-            background: #f43f5e; 
-            border-bottom: 4px solid #9f1239; 
-            border-radius: 10px; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            color: white; 
-            font-weight: 700; 
-            font-size: 12px; 
-            animation: dropBrick 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
-            padding: 8px; 
-            text-align: center; 
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        /* לוגו פשוט ונקי */
+        .logo-container {
+            display: flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.25);
+            padding: 10px 20px;
+            border-radius: 25px;
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
         }
 
-        @keyframes dropBrick { from { transform: translateY(-100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        
-        .construction-site { 
-            position: absolute; 
-            bottom: 25%; 
-            left: 50%; 
-            transform: translateX(-50%); 
-            width: 200px; 
-            min-height: 150px; 
-            border: 4px dashed rgba(255,255,255,0.4); 
-            border-radius: 2rem; 
-            display: grid; 
-            grid-template-columns: repeat(2, 1fr); 
-            grid-gap: 12px; 
-            padding: 16px; 
+        .logo-text {
+            color: white;
+            font-weight: 900;
+            font-size: 1.5rem;
+            letter-spacing: -0.02em;
+            display: flex;
+            gap: 2px;
+            /* הבטחת כיווניות משמאל לימין לטקסט האנגלי בלוגו */
+            direction: ltr; 
+        }
+
+        .logo-highlight {
+            color: #facc15;
+            margin-left: 4px;
+        }
+
+        .brick {
+            background: #f43f5e;
+            border-bottom: 4px solid #9f1239;
+            border-radius: 12px;
+            color: white;
+            font-weight: 700;
+            padding: 10px;
+            text-align: center;
+            animation: drop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        @keyframes drop {
+            from { transform: translateY(-100px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .site-grid {
+            position: absolute;
+            bottom: 22%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 220px;
+            min-height: 160px;
+            background: rgba(0,0,0,0.1);
+            border: 4px dashed rgba(255,255,255,0.4);
+            border-radius: 24px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            padding: 16px;
             align-content: end;
-            background: rgba(0,0,0,0.05);
         }
 
-        .kid-card { background: white; border-radius: 2.5rem; box-shadow: 0 10px 0 #cbd5e1; border: 3px solid #f1f5f9; }
-        .btn-bounce:active { transform: translateY(4px); box-shadow: none !important; }
+        .btn-main {
+            transition: transform 0.1s;
+            box-shadow: 0 8px 0 #ca8a04;
+        }
+
+        .btn-main:active {
+            transform: translateY(4px);
+            box-shadow: 0 4px 0 #ca8a04;
+        }
+
+        /* תיקון עברית ואנגלית */
+        .hebrew-text { direction: rtl; text-align: center; }
+        .english-text { direction: ltr; text-align: center; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
-
-        const Icon = ({ name, size = 24, className = "" }) => (
-            <i data-lucide={name} style={{ width: size, height: size }} className={className}></i>
-        );
-
-        const Logo = ({ size = "text-2xl" }) => (
-            <div className={`font-black ${size} flex items-center text-white drop-shadow-md tracking-tighter`}>
-                <span>W</span>
-                <div className="logo-o"></div>
-                <span>RDHUNTER</span>
-                <span className="text-yellow-300 ml-1 italic drop-shadow-sm">AI</span>
-            </div>
-        );
+        const { useState } = React;
 
         const App = () => {
-            const [view, setView] = useState('village'); 
-            const [bricks, setBricks] = useState(() => JSON.parse(localStorage.getItem('wh_bricks_v3')) || []);
+            const [view, setView] = useState('village');
+            const [bricks, setBricks] = useState([]);
+            const [houses, setHouses] = useState(0);
             const [loading, setLoading] = useState(false);
-            const [statusMsg, setStatusMsg] = useState('');
-            const [errorMessage, setErrorMessage] = useState(null);
-            const [completedHouses, setCompletedHouses] = useState(() => Number(localStorage.getItem('wh_houses_v3')) || 0);
+            const [error, setError] = useState(null);
             
             const apiKey = ""; 
-
-            const WORDS_PER_HOUSE = 4;
-
-            useEffect(() => {
-                localStorage.setItem('wh_bricks_v3', JSON.stringify(bricks));
-                localStorage.setItem('wh_houses_v3', completedHouses.toString());
-                if (window.lucide) window.lucide.createIcons();
-            }, [bricks, completedHouses]);
-
-            const fileToBase64 = (file) => new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = () => resolve(reader.result.split(',')[1]);
-                reader.onerror = error => reject(error);
-            });
-
-            const analyzeImage = async (base64Data) => {
-                const prompt = `Identify the main object in this photo. Return ONLY a JSON: {"en": "word", "he": "מילה"}`;
-                
-                setStatusMsg('Sending to AI...');
-                
-                try {
-                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{
-                                parts: [
-                                    { text: prompt },
-                                    { inlineData: { mimeType: "image/png", data: base64Data } }
-                                ]
-                            }]
-                        })
-                    });
-                    
-                    if (!response.ok) throw new Error(`Server error: ${response.status}`);
-                    
-                    setStatusMsg('Reading response...');
-                    const data = await response.json();
-                    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                    
-                    if (!rawText) throw new Error("Empty response");
-
-                    // Robust JSON cleaning
-                    const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-                    const jsonMatch = cleanJson.match(/\{.*\}/s);
-                    
-                    if (!jsonMatch) throw new Error("Bad format");
-                    
-                    return JSON.parse(jsonMatch[0]);
-                } catch (err) {
-                    console.error("AI Error:", err);
-                    throw err;
-                }
-            };
 
             const handleCapture = async (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
 
                 setLoading(true);
-                setErrorMessage(null);
-                setStatusMsg('Preparing photo...');
+                setError(null);
 
                 try {
-                    const base64 = await fileToBase64(file);
-                    const result = await analyzeImage(base64);
+                    const reader = new FileReader();
+                    const base64Promise = new Promise((resolve) => {
+                        reader.onload = () => resolve(reader.result.split(',')[1]);
+                        reader.readAsDataURL(file);
+                    });
+                    const base64 = await base64Promise;
 
-                    setStatusMsg('Updating village...');
-                    const exists = bricks.some(b => b.en.toLowerCase() === result.en.toLowerCase());
-                    if (exists) {
-                        setErrorMessage(`You already have a ${result.en}!`);
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{
+                                parts: [
+                                    { text: "Identify the main object. Return JSON only: {\"en\": \"WORD\", \"he\": \"מילה\"}" },
+                                    { inlineData: { mimeType: "image/png", data: base64 } }
+                                ]
+                            }]
+                        })
+                    });
+
+                    const data = await response.json();
+                    const text = data.candidates[0].content.parts[0].text;
+                    const jsonMatch = text.match(/\{.*\}/s);
+                    const result = JSON.parse(jsonMatch[0]);
+
+                    if (bricks.some(b => b.en.toLowerCase() === result.en.toLowerCase())) {
+                        setError(`כבר מצאת ${result.he}! חפש חפץ אחר.`);
                         setLoading(false);
                         return;
                     }
 
-                    const newBrick = { id: Date.now(), ...result };
-                    
-                    if (bricks.length + 1 >= WORDS_PER_HOUSE) {
+                    if (bricks.length + 1 >= 4) {
                         setBricks([]);
-                        setCompletedHouses(h => h + 1);
-                        setStatusMsg('House Built! 🏠');
-                        setTimeout(() => setView('village'), 1500);
+                        setHouses(prev => prev + 1);
+                        setView('village');
                     } else {
-                        setBricks(prev => [...prev, newBrick]);
+                        setBricks(prev => [...prev, result]);
                         setView('village');
                     }
-                } catch (error) {
-                    setErrorMessage("I'm lost! Please try again with a clearer photo.");
+                } catch (err) {
+                    setError("לא הצלחתי לזהות. נסה לצלם שוב בבירור.");
                 } finally {
                     setLoading(false);
                 }
             };
 
             return (
-                <div className="max-w-md mx-auto h-screen relative overflow-hidden bg-slate-50">
-                    <div className="game-canvas">
-                        <header className="p-6 flex justify-between items-start">
-                            <Logo size="text-2xl" />
-                            <div className="bg-white/90 px-4 py-2 rounded-2xl shadow-sm border-b-4 border-slate-200 text-center">
-                                <span className="text-[10px] font-black text-slate-400 block uppercase">Houses</span>
-                                <span className="text-xl font-black text-indigo-600">{completedHouses}</span>
+                <div className="game-world" dir="rtl">
+                    {/* לוגו פשוט */}
+                    <header className="p-6 flex justify-between items-center">
+                        <div className="logo-container">
+                            <div className="logo-text">
+                                WORDHUNTER<span className="logo-highlight">AI</span>
                             </div>
-                        </header>
-
-                        <div className="absolute bottom-[38%] w-full flex flex-wrap justify-center gap-4 px-10">
-                            {[...Array(completedHouses)].map((_, i) => (
-                                <div key={i} className="text-5xl animate-bounce">🏠</div>
-                            ))}
                         </div>
-
-                        <div className="construction-site">
-                            {bricks.map((b) => (
-                                <div key={b.id} className="brick uppercase flex flex-col">
-                                    <span className="text-[9px] opacity-70 mb-1">{b.he}</span>
-                                    <span>{b.en}</span>
-                                </div>
-                            ))}
-                            {bricks.length < WORDS_PER_HOUSE && (
-                                <div className="col-span-2 text-center pb-2">
-                                    <div className="text-[10px] font-black text-white uppercase animate-pulse tracking-widest bg-black/10 rounded-full py-1">
-                                        Need {WORDS_PER_HOUSE - bricks.length} bricks
-                                    </div>
-                                </div>
-                            )}
+                        <div className="bg-white/90 px-4 py-2 rounded-2xl font-bold text-indigo-600 shadow-lg border-b-4 border-slate-200">
+                            🏘️ {houses}
                         </div>
+                    </header>
+
+                    {/* כפר הבתים */}
+                    <div className="absolute bottom-[35%] w-full flex flex-wrap justify-center gap-4 px-10 pointer-events-none">
+                        {[...Array(houses)].map((_, i) => (
+                            <div key={i} className="text-5xl animate-bounce" style={{animationDelay: `${i*0.1}s`}}>🏠</div>
+                        ))}
                     </div>
 
+                    {/* אתר בנייה */}
+                    <div className="site-grid">
+                        {bricks.map((b, i) => (
+                            <div key={i} className="brick shadow-lg">
+                                <span className="text-[10px] opacity-90 font-medium hebrew-text">{b.he}</span>
+                                <span className="text-sm font-black tracking-tight english-text">{b.en}</span>
+                            </div>
+                        ))}
+                        {bricks.length < 4 && (
+                            <div className="col-span-2 text-center text-[11px] font-bold text-white/80 uppercase pb-1 tracking-widest">
+                                חסרות {4 - bricks.length} לבנים
+                            </div>
+                        )}
+                    </div>
+
+                    {/* מסך סריקה */}
                     {view === 'hunt' && (
-                        <div className="absolute inset-0 z-50 bg-slate-900/90 backdrop-blur-md p-6 flex items-center justify-center">
-                            <div className="kid-card w-full p-8 text-center border-4 border-yellow-400">
+                        <div className="absolute inset-0 z-50 bg-slate-900/95 flex items-center justify-center p-6 text-center">
+                            <div className="bg-white rounded-[40px] p-8 w-full max-w-xs shadow-2xl border-4 border-yellow-400">
                                 {loading ? (
-                                    <div className="py-10 flex flex-col items-center">
-                                        <div className="w-16 h-16 border-8 border-white/20 border-t-yellow-400 rounded-full animate-spin mb-6"></div>
-                                        <h3 className="text-xl font-black text-slate-800 italic uppercase">{statusMsg}</h3>
+                                    <div className="py-10">
+                                        <div className="w-14 h-14 border-4 border-rose-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+                                        <p className="font-bold text-slate-700 text-lg">מזהה חפץ...</p>
                                     </div>
                                 ) : (
                                     <>
-                                        {errorMessage ? (
-                                            <div className="mb-6">
-                                                <div className="w-12 h-12 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                                                    <Icon name="x-circle" size={24} />
-                                                </div>
-                                                <p className="text-slate-600 font-bold mb-6">{errorMessage}</p>
-                                                <button onClick={() => setErrorMessage(null)} className="text-indigo-600 font-black uppercase text-sm">Retry</button>
+                                        <div className="text-5xl mb-4">🧱</div>
+                                        <h2 className="text-2xl font-black mb-2 text-slate-800">צייד לבנים</h2>
+                                        <p className="text-slate-500 text-sm mb-8 leading-tight">צלם חפץ בבית כדי לקבל לבנה לבנייה!</p>
+                                        
+                                        {error && (
+                                            <div className="bg-rose-50 p-3 rounded-xl mb-4">
+                                                <p className="text-rose-600 font-bold text-sm">{error}</p>
                                             </div>
-                                        ) : (
-                                            <>
-                                                <div className="w-20 h-20 bg-rose-500 rounded-3xl mx-auto mb-6 flex items-center justify-center text-white shadow-lg">
-                                                    <Icon name="camera" size={32} />
-                                                </div>
-                                                <h2 className="text-2xl font-black text-slate-800 mb-2 italic uppercase tracking-tight">Brick Hunter</h2>
-                                                <p className="text-slate-400 text-xs mb-8 font-bold px-4 uppercase tracking-wider">Take a photo to build!</p>
-                                                
-                                                <label className="block w-full bg-green-400 py-4 rounded-3xl font-black text-xl text-green-900 cursor-pointer text-center uppercase shadow-[0_8px_0_#16a34a] btn-bounce">
-                                                    SNAP PHOTO
-                                                    <input type="file" accept="image/*" capture="environment" onChange={handleCapture} className="hidden" />
-                                                </label>
-                                            </>
                                         )}
-                                        <button onClick={() => setView('village')} className="mt-8 text-slate-400 font-bold uppercase text-[10px] tracking-widest">Village View</button>
+                                        
+                                        <label className="block w-full bg-green-500 py-5 rounded-[2rem] font-black text-2xl text-white cursor-pointer shadow-[0_8px_0_#15803d] btn-main">
+                                            צלם חפץ
+                                            <input type="file" accept="image/*" capture="environment" onChange={handleCapture} className="hidden" />
+                                        </label>
+                                        <button onClick={() => setView('village')} className="mt-8 text-slate-400 font-bold text-sm uppercase tracking-tighter">חזור</button>
                                     </>
                                 )}
                             </div>
                         </div>
                     )}
 
-                    <nav className="absolute bottom-8 left-0 right-0 px-10 flex justify-center z-40">
-                        <button onClick={() => setView('hunt')} className="w-20 h-20 bg-yellow-400 rounded-full flex items-center justify-center shadow-[0_10px_0_#ca8a04] border-[8px] border-white btn-bounce">
-                            <Icon name="camera" size={32} className="text-yellow-900" />
+                    {/* ניווט ראשי */}
+                    <nav className="absolute bottom-10 left-0 right-0 flex justify-center">
+                        <button 
+                            onClick={() => setView('hunt')}
+                            className="btn-main w-24 h-24 bg-yellow-400 rounded-full border-[10px] border-white flex items-center justify-center text-4xl shadow-2xl"
+                        >
+                            🔍
                         </button>
                     </nav>
                 </div>
@@ -278,7 +256,6 @@
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
-    <script src="[https://unpkg.com/lucide@latest](https://unpkg.com/lucide@latest)"></script>
 </body>
 </html>
 
