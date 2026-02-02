@@ -10,17 +10,14 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap');
-        body { font-family: 'Fredoka', sans-serif; margin: 0; background-color: #f0f9ff; overflow: hidden; }
+        body { font-family: 'Fredoka', sans-serif; margin: 0; background-color: #f0f9ff; overflow: hidden; -webkit-tap-highlight-color: transparent; }
         .game-world { background: linear-gradient(to bottom, #7dd3fc 0%, #bae6fd 40%, #4ade80 40%, #22c55e 100%); height: 100vh; position: relative; }
-        .logo-container { display: flex; align-items: center; background: rgba(255, 255, 255, 0.25); padding: 10px 20px; border-radius: 25px; backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.3); }
-        .logo-text { color: white; font-weight: 900; font-size: 1.5rem; letter-spacing: -0.02em; display: flex; gap: 2px; direction: ltr; }
-        .brick { background: #f43f5e; border-bottom: 4px solid #9f1239; border-radius: 12px; color: white; font-weight: 700; padding: 10px; text-align: center; animation: drop 0.5s ease-out; display: flex; flex-direction: column; }
+        .logo-container { display: flex; align-items: center; background: rgba(255, 255, 255, 0.25); padding: 8px 16px; border-radius: 20px; backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.3); direction: ltr; }
+        .brick { background: #f43f5e; border-bottom: 4px solid #9f1239; border-radius: 12px; color: white; font-weight: 700; padding: 10px; text-align: center; animation: drop 0.5s ease-out; display: flex; flex-direction: column; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         @keyframes drop { from { transform: translateY(-100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .site-grid { position: absolute; bottom: 22%; left: 50%; transform: translateX(-50%); width: 220px; min-height: 160px; background: rgba(0,0,0,0.1); border: 4px dashed rgba(255,255,255,0.4); border-radius: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 16px; align-content: end; }
         .btn-main { transition: transform 0.1s; box-shadow: 0 8px 0 #ca8a04; }
         .btn-main:active { transform: translateY(4px); box-shadow: 0 4px 0 #ca8a04; }
-        .hebrew-text { direction: rtl; text-align: center; }
-        .english-text { direction: ltr; text-align: center; }
     </style>
 </head>
 <body>
@@ -36,28 +33,19 @@
             const [loading, setLoading] = useState(false);
             const [error, setError] = useState(null);
             
-            const apiKey = ""; 
+            const apiKey = ""; // Environment handled
 
-            // פונקציה להקטנת תמונה לשיפור מהירות ואמינות
-            const resizeImage = (file) => {
-                return new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.readAsDataURL(file);
-                    reader.onload = (event) => {
-                        const img = new Image();
-                        img.src = event.target.result;
-                        img.onload = () => {
-                            const canvas = document.createElement('canvas');
-                            const MAX_WIDTH = 800;
-                            const scale = MAX_WIDTH / img.width;
-                            canvas.width = MAX_WIDTH;
-                            canvas.height = img.height * scale;
-                            const ctx = canvas.getContext('2d');
-                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                            resolve(canvas.toDataURL('image/jpeg', 0.7).split(',')[1]);
-                        };
-                    };
-                });
+            const processAIResponse = (text) => {
+                try {
+                    // מנקה סימני Markdown של קוד JSON אם קיימים
+                    const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+                    const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+                    if (!jsonMatch) return null;
+                    return JSON.parse(jsonMatch[0]);
+                } catch (e) {
+                    console.error("Parse error:", e);
+                    return null;
+                }
             };
 
             const handleCapture = async (e) => {
@@ -68,7 +56,12 @@
                 setError(null);
 
                 try {
-                    const base64 = await resizeImage(file);
+                    const reader = new FileReader();
+                    const base64Promise = new Promise((resolve) => {
+                        reader.onload = () => resolve(reader.result.split(',')[1]);
+                        reader.readAsDataURL(file);
+                    });
+                    const base64 = await base64Promise;
 
                     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
                         method: 'POST',
@@ -76,28 +69,28 @@
                         body: JSON.stringify({
                             contents: [{
                                 parts: [
-                                    { text: "Identify the main object in this image. Respond with a JSON object only: {\"en\": \"simple_word\", \"he\": \"מילה_פשוטה\"}. No other text." },
+                                    { text: "Identify the object. Return ONLY JSON: {\"en\": \"word\", \"he\": \"מילה\"}. Simple kids vocabulary." },
                                     { inlineData: { mimeType: "image/jpeg", data: base64 } }
                                 ]
                             }]
                         })
                     });
 
-                    if (!response.ok) throw new Error("Network response was not ok");
+                    if (!response.ok) {
+                        const errData = await response.json();
+                        throw new Error(errData.error?.message || "API Error");
+                    }
 
                     const data = await response.json();
                     const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
                     
-                    if (!rawText) throw new Error("No data from AI");
+                    if (!rawText) throw new Error("לא התקבלה תשובה מהשרת");
 
-                    // חילוץ JSON בצורה חכמה
-                    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-                    if (!jsonMatch) throw new Error("Could not find JSON in response");
-                    
-                    const result = JSON.parse(jsonMatch[0]);
+                    const result = processAIResponse(rawText);
+                    if (!result || !result.en || !result.he) throw new Error("פורמט זיהוי לא תקין");
 
                     if (bricks.some(b => b.en.toLowerCase() === result.en.toLowerCase())) {
-                        setError(`כבר מצאת ${result.he}! חפש חפץ אחר.`);
+                        setError(`כבר מצאת ${result.he}! נסה חפץ אחר.`);
                         setLoading(false);
                         return;
                     }
@@ -111,8 +104,8 @@
                         setView('village');
                     }
                 } catch (err) {
-                    console.error("Error details:", err);
-                    setError("הזיהוי נכשל. וודא שיש אינטרנט ושהצילום ברור.");
+                    console.error(err);
+                    setError(err.message === "API Error" ? "שגיאת תקשורת עם השרת" : "הזיהוי נכשל. נסה לצלם שוב מקרוב ובאור.");
                 } finally {
                     setLoading(false);
                 }
@@ -121,21 +114,21 @@
             return (
                 <div className="game-world" dir="rtl">
                     <header className="p-6 flex justify-between items-center">
-                        <div className="logo-container">
-                            <div className="logo-text">WORDHUNTER<span className="text-yellow-400 ml-1">AI</span></div>
+                        <div className="logo-container font-black text-xl text-white">
+                            WORDHUNTER<span className="text-yellow-400 ml-1">AI</span>
                         </div>
                         <div className="bg-white/90 px-4 py-2 rounded-2xl font-bold text-indigo-600 shadow-lg border-b-4 border-slate-200">🏘️ {houses}</div>
                     </header>
 
-                    <div className="absolute bottom-[35%] w-full flex flex-wrap justify-center gap-4 px-10 pointer-events-none">
+                    <div className="absolute bottom-[35%] w-full flex flex-wrap justify-center gap-4 px-10">
                         {[...Array(houses)].map((_, i) => <div key={i} className="text-5xl animate-bounce">🏠</div>)}
                     </div>
 
                     <div className="site-grid">
                         {bricks.map((b, i) => (
                             <div key={i} className="brick shadow-lg">
-                                <span className="text-[10px] opacity-90 font-medium hebrew-text">{b.he}</span>
-                                <span className="text-sm font-black tracking-tight english-text">{b.en}</span>
+                                <span className="text-[10px] opacity-90 font-medium leading-none mb-1">{b.he}</span>
+                                <span className="text-sm font-black tracking-tight leading-none uppercase" style={{direction: 'ltr'}}>{b.en}</span>
                             </div>
                         ))}
                         {bricks.length < 4 && (
@@ -149,19 +142,19 @@
                                 {loading ? (
                                     <div className="py-10">
                                         <div className="w-14 h-14 border-4 border-rose-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
-                                        <p className="font-bold text-slate-700 text-lg">מזהה חפץ...</p>
+                                        <p className="font-bold text-slate-700 text-lg">מחפש מילים בתמונה...</p>
                                     </div>
                                 ) : (
                                     <>
                                         <div className="text-5xl mb-4">📸</div>
-                                        <h2 className="text-2xl font-black mb-2 text-slate-800">צייד לבנים</h2>
-                                        <p className="text-slate-500 text-sm mb-8 leading-tight">צלם חפץ בבית כדי לקבל לבנה!</p>
-                                        {error && <div className="bg-rose-50 p-3 rounded-xl mb-4"><p className="text-rose-600 font-bold text-sm">{error}</p></div>}
+                                        <h2 className="text-2xl font-black mb-2 text-slate-800 italic uppercase tracking-tighter">Brick Hunter</h2>
+                                        <p className="text-slate-500 text-sm mb-8">צלם חפץ אמיתי כדי לקבל לבנה לבנייה!</p>
+                                        {error && <div className="bg-rose-50 p-3 rounded-xl mb-4 border border-rose-100"><p className="text-rose-600 font-bold text-xs leading-tight">{error}</p></div>}
                                         <label className="block w-full bg-green-500 py-5 rounded-[2rem] font-black text-2xl text-white cursor-pointer shadow-[0_8px_0_#15803d] btn-main">
-                                            צלם עכשיו
+                                            סרוק חפץ
                                             <input type="file" accept="image/*" capture="environment" onChange={handleCapture} className="hidden" />
                                         </label>
-                                        <button onClick={() => setView('village')} className="mt-8 text-slate-400 font-bold text-sm">חזור</button>
+                                        <button onClick={() => setView('village')} className="mt-8 text-slate-400 font-bold text-sm">ביטול</button>
                                     </>
                                 )}
                             </div>
